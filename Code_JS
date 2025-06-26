@@ -1,1 +1,197 @@
+// Groundwater Monitoring Analysis using GLDAS dataset for Bankura District, West Bengal
+
+//-------------------------------------------
+// 1. Load Bankura boundary
+//-------------------------------------------
+var gadmDataset = ee.FeatureCollection("FAO/GAUL_SIMPLIFIED_500m/2015/level2");
+
+// Filter for West Bengal
+var westBengal = gadmDataset.filter(ee.Filter.eq('ADM1_NAME', 'West Bengal'));
+
+// Filter for Bankura
+var bankuraDistrict = westBengal.filter(ee.Filter.eq('ADM2_NAME', 'Bankura'));
+Map.centerObject(bankuraDistrict, 9);
+
+// Draw border
+var border = ee.Image().byte().paint({
+  featureCollection: bankuraDistrict,
+  color: 1,
+  width: 3
+});
+Map.addLayer(border, {palette: ['black']}, 'Bankura Border');
+
+//-------------------------------------------
+// 2. Define points inside Bankura
+//-------------------------------------------
+var points = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Point([87.060, 23.250])), // North Bankura
+  ee.Feature(ee.Geometry.Point([87.190, 23.050])), // South Bankura
+  ee.Feature(ee.Geometry.Point([87.300, 23.300])), // East Bankura
+  ee.Feature(ee.Geometry.Point([87.000, 23.150]))  // West Bankura
+]);
+
+Map.addLayer(points, {color: 'red'}, 'Monitoring Points');
+
+//-------------------------------------------
+// 3. Set time range for GLDAS groundwater data
+//-------------------------------------------
+var startDate = ee.Date('2003-01-01');
+var endDate = ee.Date('2024-01-01');
+var timeDifference = endDate.difference(startDate, 'month').round();
+print('Total Months:', timeDifference);
+
+//-------------------------------------------
+// 4. Load GLDAS groundwater storage data
+//-------------------------------------------
+var groundwaterData = ee.ImageCollection("NASA/GLDAS/V022/CLSM/G025/DA1D")
+  .select('GWS_tavg') // Groundwater Storage average
+  .filterDate(startDate, endDate);
+
+//-------------------------------------------
+// 5. Generate monthly composites
+//-------------------------------------------
+var dateList = ee.List.sequence(0, ee.Number(timeDifference).subtract(1), 1).map(function(delta) {
+  return ee.Date(startDate).advance(delta, 'month');
+});
+
+var monthlyGW = ee.ImageCollection(dateList.map(function(date) {
+  var start = ee.Date(date);
+  var end = start.advance(1, 'month');
+  var monthlyAverage = groundwaterData.filterDate(start, end).mean().rename('Groundwater');
+  var numBands = monthlyAverage.bandNames().size();
+  
+  return monthlyAverage
+    .set('system:time_start', start.millis())
+    .set('system:time_end', end.millis())
+    .set('system:index', start.format('YYYY-MM-dd'))
+    .set('num_bands', ee.Number(numBands));
+})).filter(ee.Filter.gt('num_bands', 0));
+
+//-------------------------------------------
+// 6. Time Series: Bankura Overall
+//-------------------------------------------
+var groundwaterChart = ui.Chart.image.series({
+  imageCollection: monthlyGW,
+  region: bankuraDistrict,
+  reducer: ee.Reducer.mean(),
+  scale: 27000,
+  xProperty: 'system:time_start'
+}).setOptions({
+  title: 'Mean Groundwater Storage - Bankura District',
+  hAxis: {title: 'Time'},
+  vAxis: {title: 'Groundwater Storage (GWS_tavg) [m]'},
+  colors: ['blue']
+});
+print(groundwaterChart);
+
+//-------------------------------------------
+// 7. Time Series: Bankura Monitoring Points
+//-------------------------------------------
+var pointsChart = ui.Chart.image.seriesByRegion({
+  imageCollection: monthlyGW,
+  regions: points,
+  reducer: ee.Reducer.first(),
+  band: 'Groundwater',
+  scale: 27000,
+  xProperty: 'system:time_start'
+}).setOptions({
+  title: 'Groundwater Storage - Selected Points (Bankura)',
+  hAxis: {title: 'Time'},
+  vAxis: {title: 'Groundwater Storage (GWS_tavg) [m]'},
+  colors: ['green', 'orange', 'purple', 'brown']
+});
+print(pointsChart);
+
+//-------------------------------------------
+// 8. Visualize groundwater storage for Bankura
+//-------------------------------------------
+var groundwaterVis = {
+  min: -1,
+  max: 1,
+  palette: ['brown', 'yellow', 'cyan', 'blue']  // Improved palette: Brown → Yellow → Cyan → Blue
+};
+
+Map.addLayer(monthlyGW.median().clip(bankuraDistrict), groundwaterVis, 'Median Groundwater (2003–2024)', true);
+
+//-------------------------------------------
+// 9. Add Beautiful Colorbar Legend
+//-------------------------------------------
+var legend = ui.Panel({
+  style: {
+    position: 'bottom-left',
+    padding: '8px 15px',
+    backgroundColor: 'rgba(255,255,255,0.8)'
+  }
+});
+
+// Legend Title
+legend.add(ui.Label({
+  value: 'Groundwater Storage Anomaly',
+  style: {
+    fontWeight: 'bold',
+    fontSize: '16px',
+    margin: '0 0 4px 0'
+  }
+}));
+
+// Function to create colorbar
+var makeColorBar = function(palette) {
+  return ui.Thumbnail({
+    image: ee.Image.pixelLonLat().select(0),
+    params: {
+      bbox: [0, 0, 1, 0.1],
+      dimensions: '100x10',
+      format: 'png',
+      min: 0,
+      max: 1,
+      palette: palette
+    },
+    style: {
+      stretch: 'horizontal',
+      margin: '0px 8px',
+      maxHeight: '30px'
+    }
+  });
+};
+
+// Add Colorbar
+legend.add(makeColorBar(groundwaterVis.palette));
+
+// Add Labels below colorbar
+var minLabel = ui.Label(' (Low)', {fontSize: '12px'});
+var centerLabel = ui.Label('(Normal)', {fontSize: '12px', textAlign: 'center', stretch: 'horizontal'});
+var maxLabel = ui.Label('(High)', {fontSize: '12px'});
+
+var legendLabels = ui.Panel({
+  widgets: [minLabel, centerLabel, maxLabel],
+  layout: ui.Panel.Layout.flow('horizontal')
+});
+
+legend.add(legendLabels);
+
+// Add Legend to Map
+Map.add(legend);
+
+//-------------------------------------------
+// 10. Export the groundwater multi-band image
+//-------------------------------------------
+Export.image.toDrive({
+  image: monthlyGW.toBands().clip(bankuraDistrict),
+  description: 'Bankura_Groundwater_2003_2024',
+  scale: 27000,
+  region: bankuraDistrict.geometry(),
+  crs: 'EPSG:4326',
+  maxPixels: 1e13,
+  folder: 'Bankura_Groundwater_Data'
+});
+
+//-------------------------------------------
+// 11. Export Monitoring Points as Shapefile
+//-------------------------------------------
+Export.table.toDrive({
+  collection: points,
+  description: 'Bankura_Monitoring_Points',
+  fileFormat: 'SHP'
+});
+
 
