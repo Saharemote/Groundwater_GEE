@@ -24,10 +24,8 @@ Groundwater is a critical resource for agriculture and livelihoods in Bankura. T
 ### Outputs
 - 📈 **Time-Series Charts:**
   - District-wide mean groundwater storage trends (2003–2024) ![ee-chart (80)](https://github.com/user-attachments/assets/2e45a1dc-1568-4cfb-a7ae-7c49199ff4ea)
-![ee-chart (80)](https://github.com/user-attachments/assets/2e45a1dc-1568-4cfb-a7ae-7c49199ff4ea)
 
   - Monitoring point-specific groundwater storage trends  ![ee-chart (81)](https://github.com/user-attachments/assets/ce20f67a-b2ce-4b01-be8c-f13a8e27d4d5)
-![ee-chart (81)](https://github.com/user-attachments/assets/ce20f67a-b2ce-4b01-be8c-f13a8e27d4d5)
 
 - 🗺️ **Spatiotemporal Groundwater Maps:**
   - Median groundwater storage map with intuitive color-coded legend
