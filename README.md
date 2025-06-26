@@ -28,7 +28,11 @@ Groundwater is a critical resource for agriculture and livelihoods in Bankura. T
   - Monitoring point-specific groundwater storage trends  ![ee-chart (81)](https://github.com/user-attachments/assets/ce20f67a-b2ce-4b01-be8c-f13a8e27d4d5)
 
 - 🗺️ **Spatiotemporal Groundwater Maps:**
-  - Median groundwater storage map with intuitive color-coded legend
+  - Median groundwater storage map with intuitive color-coded legend ![Screenshot (598)](https://github.com/user-attachments/assets/4b063bf6-d4ce-4654-9386-abcb78f2e95a)
+
+  -  ![Screenshot (597)](https://github.com/user-attachments/assets/b0bd176d-781e-491f-9c3c-0c8e00dc5311)
+
+
 - 📂 **Data Exports:**
   - Monthly groundwater multi-band images (GeoTIFF)
   - Monitoring points as Shapefile
